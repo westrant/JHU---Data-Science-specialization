@@ -1,0 +1,153 @@
+---
+title: "Statistical Inference Project - Part 1 - Simulation Exercise"
+author: "Tim Westran"
+date: "Dec 27, 2018"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+# Part 1: Simulation Exercise Instructions
+
+1. Show the sample mean and compare it to the theoretical mean of the distribution.
+2. Show how variable the sample is (via variance) and compare it to the theoretical variance of the distribution.
+3. Show that the distribution is approximately normal.
+
+## Load Libraries
+
+```{r Libraries, results='hide', warning=FALSE, message=FALSE}
+## Let's load some libraries we need.
+library("data.table")
+library("ggplot2")
+```
+
+
+This project aims to investigate the exponential distribution in R, which can be simulated 
+(in R) with `rexp(n, lambda)`, where `lambda` $\lambda$ is the rate parameter.  The mean of 
+exponential distribution is $1/\lambda$ and the standard deviation is also $1/\lambda$. We will
+use $\lambda=0.2$ for all simulations, investigating the distribution of averages of 40 samples
+from the exponential distribution, with $\lambda=0.2$.
+
+We will perform 1000 simuations, taking the averages of 40 samples from the exponential distribution
+
+### Question 1 - Sample mean vs theoretical mean
+
+First, we will compare the sample mean with the theoretical mean.
+
+```{r getsamples}
+
+## First, set the seed to ensure repeatability.  I picked 444 just because.
+set.seed(444)
+
+## Set lambda equal to .2, as specified within the problem.
+lambda <- 0.2
+
+## Set the number of simulations run equal to 1000, as specified within the problem.
+simulations <- 1000
+
+## Set the sample size equal to 40, as specified within the problem.
+sampleSize <- 40
+
+## Let's perform the simulations.
+simulatedRuns <- replicate(simulations, rexp(sampleSize, lambda))
+
+## Now, let's calculate the mean for each set of 40 samples, one mean for each simulation.
+## simulatedMean will contain 1000 means.
+simulatedMean <- apply(simulatedRuns, 2, mean)
+```
+
+
+Now, let's look at the distribution of the simulated means.
+```{r simulatedMeanCompare}
+## Take the mean of all of the simulated means
+singleSimMean <- mean(simulatedMean)
+singleSimMean
+
+## Calculate the theoretical mean.
+theoreticalmean <- 1/lambda
+theoreticalmean
+```
+
+
+```{r simulatedMeanDistribution, echo=FALSE}
+## First, we create a histogram of the averages.
+hist(simulatedMean, breaks=60, prob=TRUE,
+     main="Histogram of means of samples",
+     xlab="")
+
+## Create a line to capture the density of the means of simulations.
+lines(density(simulatedMean), col="blue")
+
+## Draw a line at the theoretical mean.
+abline(v=theoreticalmean, col="red")
+
+## Draw a line at the center of the simulated means of samples.
+abline(v=singleSimMean, col="blue")
+
+## Create a line to capture the theoretical mean
+xAxis <- seq(min(simulatedMean), max(simulatedMean), length=100)
+yAxis <- dnorm(xAxis, mean=1/lambda, sd=(1/lambda/sqrt(sampleSize)))
+lines(xAxis, yAxis, pch=22, col="red", lty=2)
+
+## Create a legend for the chart
+legend('topright', c("simulation Mean", "theoretical Means"), lty=c(1,2), col=c("blue", "red"))
+```
+
+The simulated means distribution is centered at `r mean(simulatedMean)` and the the theoretical 
+mean is 1 / $\lambda$ = `r 1/lambda`.  We can see that the simulated mean is very close to the
+theoretical mean, and the simulated distribution is very close to the normal distribution.
+
+### Question 2 - Sample variance vs theoretical variance
+
+```{r}
+## standard deviation of simulated distribution
+simulatedSD <- sd(simulatedMean)
+simulatedSD
+
+## Standard deviation of theoretical distribution
+theoreticalSD <- (1/lambda)/sqrt(sampleSize)
+theoreticalSD
+
+## Variance of simulated distribution
+simulatedVariance <- simulatedSD^2
+simulatedVariance
+
+## variance of theoretical distribution
+theoreticalVariance <- ((1/lambda)*(1/sqrt(sampleSize)))^2
+theoreticalVariance
+```
+
+
+The variance of the sample means is `r var(simulatedMean)` and the variance of the theoretical 
+distribution is `r 1/(0.04 * 40)`.
+
+Due to the large number of samples, the distribution of simulated means approaches the normal
+distribution.  The simulated variance and standard deviation are both lower than the theoretical 
+variance and standard deviation.
+
+## Question 3 - sample distribution vs theoretical distribution
+
+Show that the distribution is approximately normal.
+
+
+```{r echo=FALSE}
+## First, let's plot a histogram of the simulated means to see if it approximates the normal distribution
+xfit <- seq(min(simulatedMean), max(simulatedMean), length=100)
+yfit <- dnorm(xfit, mean=1/lambda, sd=(1/lambda/sqrt(sampleSize)))
+hist(simulatedMean,breaks=sampleSize,prob=T,col="orange",xlab = "simulated means",
+     main="Density of simulated means",ylab="prob")
+lines(xfit, yfit, pch=22, col="blue", lty=5)
+```
+
+We can see from the distribution above that the sample distribution does approach the theoretical (normal) distribution.
+
+```{r echo=FALSE}
+## Now, let's compare the distribution of the simulated means to the theoretical distribution.
+## NOTE:  All points should lie on the line.
+
+qqnorm(simulatedMean); qqline(simulatedMean)
+```
+
+From the above QQ plot, we see that most of the means lie on the theoretical line.  This tells us that the
+simulated distribution is approximately normal.

@@ -1,0 +1,180 @@
+---
+title: "Statistical Inference Project - Part 2 - Basic Inferential Data Analysis"
+author: "Tim Westran"
+date: "Dec 27, 2018"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+# Part 2: Basic Inferential Data Analysis Instructions
+
+Now in the second portion of the project, we're going to analyze the ToothGrowth data in the R datasets package. 
+We will analyze the `ToothGrowth` data.
+
+## Load Libraries and data
+
+```{r loadLibraries, results='hide', warning=FALSE, message=FALSE}
+## Let's load some libraries we need.
+library(data.table)
+library(ggplot2)
+library(datasets)
+data(ToothGrowth)
+```
+
+## Basic information about the data
+
+```{r}
+## Dimensions of dataset
+dim(ToothGrowth)
+
+## Structure of dataset
+str(ToothGrowth)
+
+## Are there any missing values?
+sum(is.na(ToothGrowth))
+
+## What are the first 10 values?
+head(ToothGrowth, 10)
+
+## What are some basic statistics of the data?
+summary(ToothGrowth)
+```
+
+From the basic data analysis above, we see that the data contains 60 observations, with
+3 variables.  We see that there are no NAs for the data set, there are 30 samples for
+both VC and OJ, and the mean is around 19.  
+
+
+Now, let's see if there is a correlation between dosage of supplement and tooth growth.
+
+```{r echo=FALSE}
+ggplot(data = ToothGrowth, aes(x=factor(dose), y=len, fill=factor(dose))) +
+  geom_boxplot() + 
+  facet_grid(. ~ supp) +
+  xlab("Dose in mg") +   
+  ylab("Tooth length") +  
+  ggtitle("Tooth growth by supplement type")
+```
+
+```{r echo=FALSE}
+qplot(supp,len,data=ToothGrowth, facets=~dose, 
+      main="Tooth growth by supplement type"
+      ,xlab="Supplement type / dose in mg", 
+      ylab="Tooth length") + 
+    geom_boxplot(aes(fill = supp))
+```
+    
+From the above plots, we can see that the dosage does positively correlated with
+tooth growth.  The larger the dosage, the longer the tooth.  
+
+From the two plots, we see that the OJ supplement seems to promote more tooth growth over VC,
+for .5 and 1mg doses.  
+
+## Confidence intervals and hypothesis testing
+
+Now, let's verify if there is a correlation between tooth size and supplement dosage.  We want
+to see how much variance in tooth length can be attributed to supplement dosage.
+
+### Tooth growth and dosage
+
+To begin, let's look at each group of data, by dosage, individually.  We need to take three subsets of
+the data to calculate statistics on each individual group, then run a T-test on each group to get P vals
+and confidence intervals.  Basically, we want to see if there is a statiatically significant difference
+between the different supplements at various dosages, to determine if VC or OJ is the best supplement.
+
+T-test for dose of .5:
+```{r echo = FALSE}
+t.test(len ~ supp, paired=FALSE, var.equal=FALSE, data=ToothGrowth[ToothGrowth$dose == 0.5, ])
+```
+
+T-test for dose of 1:
+```{r echo = FALSE}
+t.test(len ~ supp, paired=FALSE, var.equal=FALSE, data=ToothGrowth[ToothGrowth$dose == 1.0, ])
+```
+
+T-test for dose of 2:
+```{r echo = FALSE}
+t.test(len ~ supp, paired=FALSE, var.equal=FALSE, data=ToothGrowth[ToothGrowth$dose == 2.0, ])
+```
+
+For a dose of .5, we obtain a P value of 0.006359, and a 95% confidence 
+interval of 1.719057 to 8.780943
+
+For a dose of 1, we obtain a P value of 0.001038, and a 95% confidence 
+interval of 2.802148 to 9.057852
+
+For a dose of 1, we obtain a P value of 0.9639, and a 95% confidence 
+interval of -3.79807 to 3.63807
+
+As such, we can reject the null hypothesis (that dosage has no impact on tooth growth) for the .05 and 1 mg 
+dose with 95% confidence, however we cannot reject the null for dose of 2mg.  We must conclude that, at the 2mg
+dose, there is no difference between the two supplements with respect to tooth growth.
+
+### Tooth growth and supplement type
+
+Now, let's determine if there is a correlation between tooth growth and higher dosages for each supplement.
+Basically, we want to see if there is a statistically significant correlation between higher dosages of 
+each supplement and tooth growth.
+
+For Vitamin C:
+```{r echo = FALSE}
+VC.5 <- ToothGrowth[ToothGrowth$supp == 'VC' & ToothGrowth$dose == 0.5, ]
+VC1 <- ToothGrowth[ToothGrowth$supp == 'VC' & ToothGrowth$dose == 1.0, ]
+VC2 <- ToothGrowth[ToothGrowth$supp == 'VC' & ToothGrowth$dose == 2.0, ]
+
+t.test(VC.5$len, VC1$len, paired=FALSE, var.equal=FALSE)
+```
+
+The 95% confidence interval for the T-test between the .5 and 1 mg doses is -11.265712 to -6.314288.
+As such, we can reject the null hypothesis that increasing the dose from .5 to 1 mg of vitamin C has no impact
+on tooth growth, as the confidence interval does not include 0.
+
+```{r echo=FALSE}
+t.test(VC1$len, VC2$len, paired=FALSE, var.equal=FALSE)
+```
+
+The 95% confidence interval for the T-test between the 1 and 2 mg doses is -13.054267 to -5.685733.
+As such, we can reject the null hypothesis that increasing the dose from 1 to 2 mg of vitamin C has no impact
+on tooth growth, as the confidence interval does not include 0.
+
+For both of the above T-tests, we can conclude that an increase in dosage of Vitamin C, up to 2mg, has a
+positive impact on tooth growth.
+
+
+For OJ:
+```{r echo = FALSE}
+OJ.5 <- ToothGrowth[ToothGrowth$supp == 'OJ' & ToothGrowth$dose == 0.5, ]
+OJ1 <- ToothGrowth[ToothGrowth$supp == 'OJ' & ToothGrowth$dose == 1.0, ]
+OJ2 <- ToothGrowth[ToothGrowth$supp == 'OJ' & ToothGrowth$dose == 2.0, ]
+
+t.test(OJ.5$len, OJ1$len, paired=FALSE, var.equal=FALSE)
+```
+
+The 95% confidence interval for the T-test between the .5 and 1 mg doses is -13.415634 to -5.524366.
+As such, we can reject the null hypothesis that increasing the dose from .5 to 1 mg of OJ has no impact
+on tooth growth, as the confidence interval does not include 0.
+
+```{r echo = FALSE}
+t.test(OJ1$len, OJ2$len, paired=FALSE, var.equal=FALSE)
+```
+
+The 95% confidence interval for the T-test between the 1 and 2 mg doses is -6.5314425 to -0.1885575.
+As such, we can reject the null hypothesis that increasing the dose from 1 to 2 mg of OJ has no impact
+on tooth growth, as the confidence interval does not include 0.
+
+For both of the above T-tests, we can conclude that an increase in dosage of OJ, up to 2mg, has a
+positive impact on tooth growth.
+
+Thus, for both the OJ and VC supplements, we can conclude, based on both the 95% confidence interval and the
+P-values, that increasing supplement dosage up to 2mg has a positive impact on tooth growth.
+
+## Conclusion
+
+OJ at .5 and 1mg appears to have a better impact on positive tooth growth over
+VC.  However, both OJ and VC at 2mg seem to have the same impact on positive tooth
+growth.  Increasing supplement dosage does seem to increase tooth size.
+
+We are assuming that the sample data is not paired, and that the sample populations are 
+different, with different variances.
