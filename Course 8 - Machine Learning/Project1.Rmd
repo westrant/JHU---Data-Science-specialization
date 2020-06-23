@@ -1,0 +1,165 @@
+---
+title: 'Regression Models: Peer Assessment'
+output:
+  html_document: default
+  pdf_document: default
+keep_md: yes
+---
+# Introduction
+Machine Learning: Peer Assessment  
+Author:  Tim Westran  
+Purpose:  Determine how well exercises are performed
+Data set used:  The mtcars data set.
+
+
+# Practical Machine Learning - Prediction Assignment Writeup
+
+## Synopsis
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+### Load libraries and set options
+First, we want to load libraries and set options.
+```{r includeLibraries, results = "HIDE"}
+## Ensure we have loaded the libraries we need.
+library(corrplot)
+library(randomForest)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(doParallel)
+
+## disable scientific notation
+options(scipen = 999)
+options(warn=-1)
+registerDoParallel(cores=4)
+```
+
+### Download files and prepare data
+```{r, cache = TRUE}
+## Download the training & test data and read it as csv file:
+if (!file.exists("pmlTraining.csv")) {
+    download.file("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", 
+        destfile = "pmlTraining.csv")
+}
+if (!file.exists("pmlTesting.csv")) {
+    download.file("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", 
+        destfile = "pmlTesting.csv")
+}
+
+## Read in the training and test data sets.
+training <- read.csv("pmlTraining.csv", header = TRUE, na.strings = c("NA",""))
+testing <- read.csv("pmlTesting.csv", header = TRUE, na.strings = c("NA",""))
+
+## Create our training and test sets.  70% of samples to training, 30% to test.
+labels <- createDataPartition(training$classe, p = 0.7, list = FALSE)
+train <- training[labels, ]
+test <- training[-labels, ]
+```
+
+## Data Preprocessing 
+Some of the variables have next to no variance, and others have many NA data points.  We can remove variables with 
+low variance, variables with many NAs, and any variables which don't provide much information about the data.
+```{r DataCleaning, cache = TRUE}
+## Grab all variables from the training set that have low variability.
+NearZero <- nearZeroVar(train)
+
+## Remove these low variability variables from both the training and test sets.
+train <- train[ ,-NearZero]
+test <- test[ ,-NearZero]
+
+## Find all variables which have many NA values
+labels <- apply(train, 2, function(x) mean(is.na(x))) > 0.95
+
+## Remove the high NA variables from our training and test sets.
+train <- train[, -which(labels, labels == FALSE)]
+test <- test[, -which(labels, labels == FALSE)]
+
+## Remove unneeded columns.
+train <- train[ , -(1:5)]
+test <- test[ , -(1:5)]
+```
+
+By removing the low variance variables, variables with many NAs, and purely descriptive columns, we reduce the
+total number of variables from 160 to 54.
+
+## Exploratory Analysis
+
+First, we use a correlation plot to investigate variable dependence.
+For this plot, darker colors mean higher correlation.  
+```{r CorrelationPlot, fig.width=12, fig.height=8, cache = TRUE}
+corrplot(cor(train[,-54]), method = "color", type = "lower", tl.cex = 0.8, tl.col = rgb(0,0,0))
+```
+
+## Prediction Model Selection
+
+We will pick from 3 different methods to predict variables.  We will look at decision trees, random forests, and generalized boosted models.
+
+### Decision Tree
+```{r DecisionTree, message = FALSE, warning = FALSE, fig.width=18, fig.height=10, cache = TRUE}
+
+## First, set the seed.  Picking a random number.
+set.seed(444)
+
+## Next, create the decision tree.
+DecisionTreeModel <- rpart(classe ~ ., data = train, method = "class")
+
+##  Plot the decision tree.
+fancyRpartPlot(DecisionTreeModel)
+
+## Last, show a confusion matrix.
+DecisionTreePredictor <- predict(DecisionTreeModel, test, type = "class")
+DecisionTreeConfusionMatrix <- confusionMatrix(DecisionTreePredictor, test$classe)
+DecisionTreeConfusionMatrix
+```
+
+### Random Forest
+```{r CrossValidation, message = FALSE, cache = TRUE}
+## First, set the seed.  Picking a random number.
+set.seed(444)
+
+## Use 10-Fold Cross Validation to calculate errors.
+control <- trainControl(method = "cv", number = 10, verboseIter=FALSE)
+model <- train(classe ~ ., data = train, method = 'rf', trControl = control)
+model
+plot(model)
+```
+
+Using cross validation, we estimate the Out of sample error rate to be: 0.276% (using 27 variables)
+
+```{r RandomForest, message = FALSE, cache = TRUE}
+## Next, create the random forest.
+RandomForestModel <- train(classe ~ ., data = train, method = "rf", trControl = control)
+RandomForestModel$finalModel
+
+## Last, show a confusion matrix.
+RandomForestPredictor <- predict(RandomForestModel, test)
+RandomForestConfusionMatrix <- confusionMatrix(RandomForestPredictor, test$classe)
+RandomForestConfusionMatrix
+```
+
+
+### Generalized Boosted Model
+```{r GBM, message = FALSE, cache = TRUE}
+## First, set the seed.  Picking a random number.
+set.seed(444)
+
+## Next, create the generalized boosted model.
+control <- trainControl(method = "repeatedcv", number = 5, repeats = 1, verboseIter = FALSE)
+GeneralizedBoostModel <- train(classe ~ ., data = train, trControl = control, method = "gbm", verbose = FALSE)
+GeneralizedBoostModel$finalModel
+
+## Last, show a confusion matrix.
+GeneralizedBoostPredictor <- predict(GeneralizedBoostModel, test)
+GeneralizedBoostConfusionMatrix <- confusionMatrix(GeneralizedBoostPredictor, test$classe)
+GeneralizedBoostConfusionMatrix
+```
+
+The Random Forest offers the highest accuracy, so we will use the random forest model for our prediction algoritm.
+
+## Predicting Test Set Output
+
+```{r TestSetPrediction, messages = FALSE}
+RandomForestPredictor <- predict(RandomForestModel, testing)
+RandomForestPredictor
+```
