@@ -1,0 +1,140 @@
+---
+title: 'Regression Models: Peer Assessment'
+output:
+  pdf_document: default
+  html_document: default
+keep_md: yes
+---
+## Introduction
+Regression Models: Peer Assessment  
+Author:  Tim Westran  
+Purpose:  Determine if manual or automatic transmissions are more efficient  
+Data set used:  The mtcars data set.
+
+
+## Executive Summary
+The basic goal of this assignment is to utilize the `mtcars` dataset, which contains fuel economy
+metrics for 32 vehicles manufactured between 1973 and 1974, to determine if an automatic or
+manual transmission is better for fuel economy.  
+
+Questions answered:
+1.  Is an automatic or manual transmission better for MPG?
+2.  Quantify the MPG difference between automatic and manual transmissions
+
+People may assume that a vehicle with a manual transmission will have higher fuel economy than
+a vehicle with an automatic transmission.  We set out to prove or disprove the hypothesis that
+manual drive vehicles are more efficient.
+
+From the analysis we conduct, we will see that the transmission type does not have a significant
+impact on vehicle fuel ecomony.
+
+
+## Data Processing
+### Load libraries and set options
+First, we want to load libraries and set options.
+
+```{r includeLibraries, results = "HIDE"}
+## Ensure we have loaded the libraries we need.
+library("datasets")
+library("plyr")
+library("ggplot2")
+
+## load the data set
+data(mtcars)
+
+## disable scientific notation
+options(scipen = 999)
+
+```
+
+### Data cleaning
+Now, we want to perform some data cleaning. 
+
+```{r datacleaning, warning=FALSE, results = "HIDE"}
+## convert variables to factors.
+mtcars$cyl <- factor(mtcars$cyl)
+mtcars$vs <- factor(mtcars$vs)
+mtcars$am <- factor(mtcars$am)
+mtcars$gear <- factor(mtcars$gear)
+mtcars$carb <- factor(mtcars$carb)
+
+## Convert the binary variable, transmission type.
+trans <- revalue(mtcars$am, c('0'="automatic", '1'="manual"))
+
+levels(mtcars$am) <- c("Automatic", "Manual")
+levels(mtcars$vs) <- c("V Engine", "Straight Engine")
+```
+
+### Data analysis
+Now, some rudimentary data analysis. 
+
+```{r dataanalysis, warning=FALSE}
+## Let's build a boxplot showing transmission type versus fuel economy
+ggplot(mtcars, aes(x=trans, y=mpg, fill=trans)) +
+    geom_boxplot() +
+    xlab("Transmission type") +
+    ylab("MPG")
+
+```
+
+From the box plot, we see a large difference in fuel economy betweeen vehicles with
+automatic transmissions and vehicles with manual transmissions.  However, this correlation
+could be due to other factors.  
+
+Now, let's see how much of the variability can be explained away by transmission type.
+```{r datamodel}
+## Create a linear model, comparing mpg to transmission type.
+fit1 <- lm(mpg ~ am, data=mtcars)
+```
+
+From the summary of our first linear model (in appendix), we see that the coefficients for both the
+intercept and the transmission type are significant.  However, we also see that accounting for
+only transmission type only explains away `r summary(fit1)$r.squared * 100`% of the 
+variation in fuel economy.
+
+Based on the analysis documented in the appendix, several variables seem to have high
+correlation with MPG.  We will create a new model using all variables, then select a 
+subset of these variables which yield the highest correlation.
+
+```{r}
+## First, let's create a new model with all variables.
+fit2 <- lm(mpg ~ ., data=mtcars)
+
+## Now, let's trim the model to capture the most correlated variables.
+fit3 <- step(fit2, direction="both", trace=0)
+```
+
+The optimal model contains four variables:  Transmission type (am), vehicle weight (weight),
+horsepower (hp), and the number of cylinders (cyl).  These 4 variables explain 
+`r summary(fit3)$r.squared * 100`% of variation in fuel economy.  It logically makes sense
+that vehicle weight and engine size would contribute significantly to the overall fuel economy.
+indeed, we see that the type of transmission has a minimal impact on fuel economy.
+
+## Final results
+
+We reject the null hypothesis, that manual transmission vehicles are more efficient
+than automatic transmission vehicles.  From the analysis performed, we see that vehicle weight
+has a strong correlation with mileage.  A 1000 lb increase in vehicle weight will result in a
+decrease of `r abs(fit3$coefficients[[5]])` MPG.  Similarly, an increase of one horsepower will
+result in a decrease of `r abs(fit3$coefficients[[4]])` MPG.  Finally, we see that engine size has
+a strong correlation with mileage, as moving from a 4 to 6 cylinder engine decreases fuel 
+economy `r abs(fit3$coefficients[[2]])` MPG, and moving from a 6 to an 8 cylinder engine
+decreases fuel economy by `r abs(fit3$coefficients[[3]])` MPG.
+
+
+## Appendix
+Shows a summary of the most correlated variables.
+```{r}
+summary(fit3)
+```
+
+Looking at the most correlated variables
+```{r, warning=FALSE, fig.width=8, fig.height=6}
+par(mfrow = c(2,2))
+plot(fit3)
+```
+
+```{r}
+## Show summary statistics on this first linear model.
+summary(fit1)
+```
