@@ -1,0 +1,36 @@
+---
+title: "Directions - Word prediction"
+date: "3/5/2020"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## What this is
+
+This app performs text prediction, based on user input.
+I'm using the stupid backoff algorithm to perform text prediction.  When trying to find the 
+probability of word appearing in a sentence, it will first look for context for the word at 
+the n-gram level and if there is no n-gram of that size it will recurse to the (n-1)-gram. 
+The recursion stops at unigrams.
+
+## How we got here
+
+I started with the Coursera Swiftkey dataset
+https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip
+
+The zip file contains three text files:  Blogs, News, and Twitter.
+
+Each English language file was parsed, a corpus was generated, the data was tokenized,
+and n-grams were created.  I created a unigram (1-gram), bigram (2-gram), trigram (3-gram),
+and a quadgram (4-gram).  These n-grams consisted of a combination of words (or a single word, 
+with the unigrams), and a probability of this word occurring.  The n-grams were then saved into
+4 text files, and imported into the app for prediction.
+
+## How to use it
+
+To use the app, just type in some text.  I've pre-populated the text input with a single word
+to get you started.  The 5 most likely words are displayed shortly after you stop typing.
+Feel free to select the next word and watch the predictor form sentences.
+

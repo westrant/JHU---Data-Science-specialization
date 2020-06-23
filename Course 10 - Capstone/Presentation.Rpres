@@ -1,0 +1,59 @@
+Swiftkey data - Next word prediction app
+========================================================
+author:  Tim Westran
+date:   03/05/2020
+autosize: true
+
+[Shiny App - Swiftkey data next word prediction](https://timw.shinyapps.io/CapstoneProject/)
+
+[Github Repo](https://github.com/westrant/Capstone/)
+
+What was done
+========================================================
+- We created a next word prediction app.
+- Started with the [Coursera Swiftkey dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)
+- This dataset contains three text files: Blogs, News, and Twitter.
+- Each text file was parsed, a corpus was generated, the data was tokenized, and n-grams were created.
+- Additionally, each text file was cleaned.
+- 4 n-grams were created:  1-gram, 2-gram, 3-grams, 4-grams.
+- These n-grams consisted of a combination of words (or a single word, with the unigrams) and a probability of this combination occurring.
+- The n-grams were then saved into 4 text files, and imported into the app for prediction.
+
+
+How it works
+========================================================
+- The Shiny app is split into two files: an app.R and a predictor.R
+- The predictor uses the "stupid backoff" algorithm.
+- How stupid backoff works:
+-- When trying to find the probability of word appearing in a sentence, it will first look for context for the word at the n-gram level.
+-- If there is no n-gram of that size it will recurse to the (n-1)-gram. 
+-- The recursion stops at unigrams.
+- So, for example, if we enter "the rains in", then the stupid backoff will first look at the 3-gram level.
+- If no match is found, it then goes to the 2-gram level.
+- If no match is found at the 2-gram level, it goes to the 1-gram level.
+- Recursion stops at the unigram level (1-gram).
+
+
+How to use it
+========================================================
+- Fire up the app and type in a word.
+- Or just use the default.
+-- The app opens up with "hello" displayed by default.
+- As you type, the app determines what the most likely next words are likely to be, and displays the 5 most likely.
+- If no match is found at the 1-gram level, my algorithm displays 5 popular English words ("the", "I", "so", "we", "they")
+- Additionally, if no user input is detected (the input box is left blank), my algoritm displays the same 5 popular words as listed above.
+- Click on the predicted word to add it to your growing sentence.  
+- See what kind of story the prediction algorithm can build!
+
+What's next
+========================================================
+- The app was only trained on English, so none of the other languages work.
+-- A good place to start would be implementing additional languages.
+- Also, the data cleaning algorithm could use some work, but it takes so long to run (about 1.5 hours), this effort was abandoned once a working data set was generated.
+- Finally, some pretty graphs or word clouds may be a nice addition, but I focused on speeding up the prediction algorithm over adding in graphics.
+- Thank you for reviewing and reading!  
+
+Oh, and ..... We survived the Capstone!
+
+
+
