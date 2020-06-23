@@ -1,0 +1,209 @@
+---
+title: 'Reproducible Research: Peer Assessment 2'
+output: html_document
+keep_md: yes
+---
+## Introduction
+Reproducible Research - Peer Assignment 2  
+Author:  Tim Westran  
+Purpose:  Answer questions about the NOAA Storm Database dataset  
+Data set used:  https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2  
+Github repo for the Course: [Reproducible Research](https://github.com/westrant/RepData_PeerAssessment2)  
+
+
+## Synopsis
+The basic goal of this assignment is to explore the NOAA Storm Database and answer some basic questions about severe weather events. Various questions have been posed, and are answered below using the dataset.  Code is provided for the analysis performed.  
+
+Questions answered:
+1.  Across the United States, which types of events are most harmful with respect to population health? 
+2.  Across the United States, which types of events have the greatest economic consequences?
+
+
+## Data Processing
+### Load libraries and set options
+```{r includeLibraries}
+## Ensure we have loaded the libraries we need.
+library("data.table")
+library("ggplot2")
+
+## disable scientific notation
+options(scipen = 999)
+```
+
+### Download data
+Download the bz2 file and read it into a dataframe.
+```{r DownloadAndReadData}
+## Set the URL of the file to download
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+
+## Download the file to the working directory, save with filename:  repdata-data-StormData.csv.bz2
+download.file(fileUrl, destfile = paste0("./", "repdata-data-StormData.csv.bz2"))
+
+## Read in .bz2 file and store in a dataframe called stormData
+stormData <- read.csv(bzfile("repdata-data-StormData.csv.bz2"))
+
+## Convert StormData dataframe to datatable called stormDataTable
+stormDataTable <- as.data.table(stormData)
+```
+
+### Extract columns we care about.
+We only need to keep some of the columns, so we remove everything except: EVTYPE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP
+```{r subsetData, results = "hide", cache = TRUE}
+## Remove everything except EVTYPE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP
+columnsToDrop <- colnames(stormDataTable[, !c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")])
+
+## Set all other columns to NULL.
+stormDataTable[, c(columnsToDrop) := NULL]
+
+## Grab all rows where a fatality or injury occurred, looking only at the columns we care about.
+stormDataTable <- stormDataTable[(EVTYPE != "?" & (INJURIES > 0 | FATALITIES > 0 | PROPDMG > 0 | CROPDMG > 0)), c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP") ]
+```
+
+
+### convert dollars and exponents to a single value
+To determine the impact of weather on the economy, we need to example property and crop damage figures.
+Property damage is represented by PROPDMG, which contains the raw dollars, and PROPDMGEXP, which contains
+the exponents.  We need to transform these two variables into a single value for each row.
+
+Similarly, crop damage is represented by CROPDMG, which contains the raw dollars, and CROPDMGEXP, which 
+contains the exponents.  We need to transform these two variables into a single value for each row.
+```{r mergeValues, results = "hide", cache = TRUE}
+
+## First, we modify all column names so they are all uppercase.
+colNamesUpper <- c("PROPDMGEXP", "CROPDMGEXP")
+stormDataTable[,  (colNamesUpper) := c(lapply(.SD, toupper)), .SDcols = colNamesUpper]
+
+## Now, convert all property and crop damage exponent symbols to actual values.  The data set has different
+## symbols mapped to different exponents.  
+## First, property damage
+propertyDmgConv <-  c("\"\"" = 1, "-" = 1, "+" = 1, "0" = 1, "1" = 10, "2" = 100,
+                "H" = 100,  "3" = 1000,  "K" = 1000, "4" = 10000, "5" = 10^5, "6" = 10^6, 
+                "M" = 10^6, "7" = 10^7, "8" = 10^8, "9" = 10^9, "B" = 10^9)
+
+## Then crop damage exponent symbol mapping.
+cropDmgConv <-  c("\"\"" = 1, "?" = 1, "0" = 1, "K" = 1000, "M" = 10^6, "B" = 10^9)
+
+## Now, insert our converted exponents back into the data table.
+## First, property damage.
+stormDataTable[, PROPDMGEXP := propertyDmgConv[as.character(stormDataTable[,PROPDMGEXP])]]
+
+## Setting all exponents with a value of NA to 1 (no exponent).
+stormDataTable[is.na(PROPDMGEXP), PROPDMGEXP := 1 ]
+
+## Then, property damage.
+stormDataTable[, CROPDMGEXP := cropDmgConv[as.character(stormDataTable[,CROPDMGEXP])] ]
+
+## Again, setting all exponents with a value Of NA to 1 (no exponent).
+stormDataTable[is.na(CROPDMGEXP), CROPDMGEXP := 1 ]
+
+## Add two new columns, propertyCost and cropCost
+stormDataTable <- stormDataTable[, .(EVTYPE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, propertyCost = PROPDMG * PROPDMGEXP, CROPDMG, CROPDMGEXP, cropCost = CROPDMG * CROPDMGEXP)]
+```
+
+
+### Calculate the total cost and fatalities / injuries
+Here, we total up both the property and crop costs, then add all costs together to generate a total cost.
+```{r totalCost, cache = TRUE}
+## Create a new data table called totalCost that holds all summed cost figures.
+totalCost <- stormDataTable[, .(propertyCost = sum(propertyCost), cropCost = sum(cropCost), Total_Cost = sum(propertyCost) + sum(cropCost)), by = .(EVTYPE)]
+
+## Order from highest to lowest.
+totalCost <- totalCost[order(-Total_Cost), ]
+
+## Grab the top 10 costs and store them in the totalCost data table.
+totalCost <- totalCost[1:10, ]
+
+## Now, create a new data table called totalInjuriesAndFatailities that holds all of the summed injury
+## and fatality statistics.
+totalInjuriesAndFatailities <- stormDataTable[, .(FATALITIES = sum(FATALITIES), INJURIES = sum(INJURIES), totals = sum(FATALITIES) + sum(INJURIES)), by = .(EVTYPE)]
+
+## Order from highest to lowest.
+totalInjuriesAndFatailities <- totalInjuriesAndFatailities[order(-FATALITIES), ]
+
+## Grab the top 10 injuries and fatalities, and store them in the data table.
+totalInjuriesAndFatailities <- totalInjuriesAndFatailities[1:10, ]
+```
+
+## Results
+
+### Health Inpact of Weather Events
+
+Health impact of weather events - Weather events which are most harmful.
+```{r healthImpactResults}
+## First, create a new variable named harmfulEvents.
+harmfulData <- melt(totalInjuriesAndFatailities, id.vars="EVTYPE", variable.name = "Impact")
+
+## Create the chart to answer the question:  Which types of events are most harmful to population health?
+healthChart <- ggplot(harmfulData, aes(x=reorder(EVTYPE, -value), y=value)) + 
+    geom_bar(stat="identity", aes(fill=Impact), position="dodge") + 
+    ylab("Count") + 
+    xlab("Disaster") + 
+    theme(axis.text.x = element_text(angle=45, hjust=1))+ 
+    ggtitle("Most harmful weather events to population health") + 
+    theme(plot.title = element_text(hjust = 1))
+
+```
+
+### Chart - Which weather events are most harmful?
+```{r harmfulResultsDispHealth}
+## Display the chart of harmful effects
+healthChart
+```
+
+From the above chart, we can see that Tornados are the most harmful events, with 
+`r format(totalInjuriesAndFatailities[1,2], big.mark = ",", scientific = FALSE)` fatalities, 
+and `r format(totalInjuriesAndFatailities[1,3], big.mark = ",", scientific = FALSE)` injuries.
+
+This is followed by excessive heat, with 
+`r format(totalInjuriesAndFatailities[2,2], big.mark = ",", scientific = FALSE)` fatalities, 
+and `r format(totalInjuriesAndFatailities[2,3], big.mark = ",", scientific = FALSE)` injuries.
+
+With flash floods coming in 3rd, with 
+`r format(totalInjuriesAndFatailities[3,2], big.mark = ",", scientific = FALSE)` fatalities, 
+and `r format(totalInjuriesAndFatailities[3,3], big.mark = ",", scientific = FALSE)` injuries.
+
+### Economic Inpact of Weather Events
+
+Economic impact of weather events -  Weather events which have the greatest economic impact
+```{r economicImpact}
+## First, create a new variable named Cost.
+economicImpact <- melt(totalCost, id.vars="EVTYPE", variable.name = "Cost")
+
+## Create the chart to answer the question:  Which types of events are most harmful to population health?
+economicImpactChart <- ggplot(economicImpact, aes(x=reorder(EVTYPE, -value), y=value)) +
+    geom_bar(stat="identity", aes(fill=Cost), position="dodge") + 
+    ylab("Cost") + 
+    xlab("Disaster") + 
+    theme(axis.text.x = element_text(angle=45, hjust=1)) + 
+    ggtitle("Most harmful weather events by economc impact") + 
+    theme(plot.title = element_text(hjust = 1))
+```
+
+### Chart - Which weather events have the greatest economic impact?
+```{r harmfulResultsDispEcon}
+## Display the chart of harmful effects
+economicImpactChart
+```
+
+From the above chart, we can see that floods are the most harmful events economically, 
+with `r format(totalCost[1,2], big.mark = ",", scientific = FALSE)` in property damage, 
+`r format(totalCost[1,3], big.mark = ",", scientific = FALSE)` in crop damage,
+and `r format(totalCost[1,4], big.mark = ",", scientific = FALSE)` in total damage.
+
+This is followed by hurricanes / typhoons, with 
+`r format(totalCost[2,2], big.mark = ",", scientific = FALSE)` in property damage, 
+`r format(totalCost[2,3], big.mark = ",", scientific = FALSE)` in crop damage,
+and `r format(totalCost[2,4], big.mark = ",", scientific = FALSE)` in total damage.
+
+With tornados coming in 3rd, with 
+`r format(totalCost[3,2], big.mark = ",", scientific = FALSE)` in property damage, 
+`r format(totalCost[3,3], big.mark = ",", scientific = FALSE)` in crop damage,
+and `r format(totalCost[3,4], big.mark = ",", scientific = FALSE)` in total damage.
+
+```{r datadisplay}
+## Display top 10 most harmful events economically.
+head(totalCost,10)
+
+## Display top 10 most harmful events health-wise.
+head(totalInjuriesAndFatailities,10)
+```
