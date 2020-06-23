@@ -1,0 +1,84 @@
+---
+title: "Data Products - Project 2"
+author: "Tim W"
+date: "2/27/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Problem Description:
+
+1. Create a web page using R Markdown that features a map created with Leaflet.
+
+2. Host your webpage on either GitHub Pages, RPubs, or NeoCities.
+
+3. Your webpage must contain the date that you created the document, and it must contain a map created with Leaflet. We would love to see you show off your creativity! 
+
+## Approach:
+
+Use earthquake data from the USGS site (https://earthquake.usgs.gov/earthquakes/feed/v1.0/csv.php), from Feb 27th, 2020, at 12:37pm EST.  Data source used is all earthquakes of magnitude 4.5 or greater, recorded over the past week.
+
+Data source:  https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.csv
+
+
+```{r Load_Libraries}
+# First things first, let's make sure those libraries are loaded.
+# Of course, we need leaflet for map plotting.
+library(leaflet)
+# Let's also use htmltools to make formatting easier (lazy for the win, right?)
+library(htmltools)
+```
+
+```{r Read_Data}
+# Then, let's read in the CSV file pulled from the USGS site
+QuakeData <- read.csv(file = "./4.5_week.csv", 
+                    header = TRUE, 
+                    sep = ",")
+
+# This file is a comma separated value flat file, so separation character is a comma.
+```
+
+```{r Select_Columns}
+# Now, let's grab the columns we care about from this spreadsheet.
+# The columns of interest are:
+# Place - a description of where the earthquake took place.
+# Mag - the (Richter scale) magnitude of the earthquake.
+# Lat - the latitude of the earthquake.
+# long - the longitude of the earthquake.
+
+map_data <- data.frame(place = QuakeData$place, 
+                       mag = c(QuakeData$mag), 
+                       lat = c(QuakeData$latitude), 
+                       long = c(QuakeData$longitude))
+
+# All data is read into a data frame called map data.
+```
+
+
+```{r Plot_Map}
+# Finally, we have what we need to plot the map.
+# We'll be using the pipe command to send data between the different functions of Leaflet
+# Using variable called PlotMap to hold the map as we build it.
+
+PlotMap <- map_data %>%
+  leaflet() %>%
+  addTiles() %>%
+  addMarkers(popup=paste
+             ("<br>Location: ", 
+               htmlEscape(map_data$place), 
+              "<br>Magnitude: ", 
+               htmlEscape(map_data$mag))) 
+
+# Our map will contain all earthquakes (of magnitude larger than 4.5) recorded
+# over the past week.
+# There are markers designating the name of where the earthquake took place
+# as well as the recorded magnitude.
+
+# Now, let's actually display the map.
+PlotMap
+```
+                     
+                     
